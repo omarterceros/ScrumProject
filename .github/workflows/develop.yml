@@ -35,11 +35,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       
+      # Cache modificada con versión única (cambiar v100 si es necesario)
       - name: Cache Composer dependencies
         uses: actions/cache@v3
         with:
           path: vendor
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}-v100
           restore-keys: ${{ runner.os }}-composer-
 
       - name: Cache Node modules
@@ -51,11 +52,12 @@ jobs:
           key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
           restore-keys: ${{ runner.os }}-node-
       
+      # Extensions actualizadas para coincidir con local
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.1'
-          extensions: mbstring, pdo, pdo_pgsql, xml, curl, zip
+          extensions: mbstring, pdo, pdo_pgsql, xml, curl, zip, ctype
           coverage: none
       
       - name: Install Node.js dependencies
@@ -67,8 +69,9 @@ jobs:
       - name: Copy .env
         run: cp .env.example .env
       
+      # Comando con verbosidad aumentada (-vvv)
       - name: Install Composer dependencies
-        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --optimize-autoloader
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --optimize-autoloader -vvv
       
       - name: Generate key
         run: php artisan key:generate
@@ -115,11 +118,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       
+      # Cache modificada misma versión que en test
       - name: Cache Composer dependencies
         uses: actions/cache@v3
         with:
           path: vendor
-          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}-v100
           restore-keys: ${{ runner.os }}-composer-
 
       - name: Cache Node modules
@@ -135,7 +139,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.1'
-          extensions: mbstring, pdo, pdo_pgsql, xml, curl, zip
+          extensions: mbstring, pdo, pdo_pgsql, xml, curl, zip, ctype
           coverage: none
 
       - name: Install Chrome dependencies
@@ -162,8 +166,9 @@ jobs:
       - name: Copy .env
         run: cp .env.example .env
       
+      # Verbosidad aumentada también aquí
       - name: Install Composer dependencies
-        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --optimize-autoloader
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --optimize-autoloader -vvv
       
       - name: Generate key
         run: php artisan key:generate
@@ -255,3 +260,14 @@ jobs:
             php artisan view:cache
             sudo systemctl restart php-fpm nginx
           ENDSSH
+
+  # Nuevo job añadido para limpiar caché (opcional)
+  cleanup-cache:
+    name: Cleanup Cache
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Delete Composer cache
+        uses: actions/cache/delete@v1
+        with:
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}-v100
