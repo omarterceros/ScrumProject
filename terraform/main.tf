@@ -20,21 +20,6 @@ module "vpc" {
   project_name      = var.project_name
 }
 
-module "rds" {
-  source = "./modules/rds"
-  
-  vpc_id                  = module.vpc.vpc_id
-  subnet_ids              = module.vpc.private_subnet_ids
-  environment             = var.environment
-  project_name            = var.project_name
-  db_instance_class       = var.db_instance_class
-  db_allocated_storage    = var.db_allocated_storage
-  db_name                 = var.db_name
-  db_username             = var.db_username
-  db_password             = var.db_password
-  db_port                 = var.db_port
-}
-
 module "ec2" {
   source = "./modules/ec2"
   
@@ -45,6 +30,22 @@ module "ec2" {
   instance_type           = var.instance_type
   key_name                = var.key_name
   db_host                 = module.rds.db_instance_address
+  db_name                 = var.db_name
+  db_username             = var.db_username
+  db_password             = var.db_password
+  db_port                 = var.db_port
+}
+
+module "rds" {
+  source = "./modules/rds"
+  
+  vpc_id                  = module.vpc.vpc_id
+  subnet_ids              = module.vpc.private_subnet_ids
+  ec2_security_group_id   = module.ec2.security_group_id
+  environment             = var.environment
+  project_name            = var.project_name
+  db_instance_class       = var.db_instance_class
+  db_allocated_storage    = var.db_allocated_storage
   db_name                 = var.db_name
   db_username             = var.db_username
   db_password             = var.db_password

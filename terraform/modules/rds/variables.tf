@@ -8,6 +8,11 @@ variable "subnet_ids" {
   type        = list(string)
 }
 
+variable "ec2_security_group_id" {
+  description = "Security group ID for EC2 instances"
+  type        = string
+}
+
 variable "environment" {
   description = "Environment (develop or production)"
   type        = string
@@ -29,21 +34,21 @@ variable "db_allocated_storage" {
 }
 
 variable "db_name" {
-  description = "Name of the database"
+  description = "Database name"
   type        = string
 }
 
 variable "db_username" {
-  description = "Username for the database"
+  description = "Database username"
   type        = string
 }
 
 variable "db_password" {
-  description = "Password for the database"
+  description = "Database password"
   type        = string
 }
 
 variable "db_port" {
-  description = "Port for the database"
+  description = "Database port"
   type        = number
 }

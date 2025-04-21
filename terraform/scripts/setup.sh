@@ -1,45 +1,56 @@
 #!/bin/bash
-set -e
 
-# Variables
-ENVIRONMENT=$1
+# Script para configurar el entorno de Terraform
 
-# Validar parámetros
-if [ -z "$ENVIRONMENT" ]; then
-    echo "Uso: $0 <environment>"
-    echo "Ejemplo: $0 develop"
-    exit 1
+# Verificar que se proporcione un entorno
+if [ "$1" != "develop" ] && [ "$1" != "production" ]; then
+  echo "Uso: $0 [develop|production]"
+  exit 1
 fi
 
-echo "Configurando infraestructura para el entorno: $ENVIRONMENT"
+ENV=$1
+REGION="us-east-1"
+STATE_BUCKET="scrumproject-terraform-states"
 
-# Crear bucket S3 para almacenar el estado de Terraform (si no existe)
-aws s3api create-bucket \
-    --bucket scrumproject-terraform-states \
-    --region us-west-2 \
-    --create-bucket-configuration LocationConstraint=us-west-2
+# Verificar si el bucket de estado de Terraform existe, si no, crearlo
+aws s3api head-bucket --bucket $STATE_BUCKET 2>/dev/null
+if [ $? -ne 0 ]; then
+  echo "Creando bucket de estado de Terraform: $STATE_BUCKET"
+  aws s3 mb s3://$STATE_BUCKET --region $REGION
+  
+  # Habilitar versionamiento del bucket
+  aws s3api put-bucket-versioning --bucket $STATE_BUCKET --versioning-configuration Status=Enabled --region $REGION
+  
+  # Opcional: Habilitar encriptación del bucket
+  aws s3api put-bucket-encryption --bucket $STATE_BUCKET --server-side-encryption-configuration '{
+    "Rules": [
+      {
+        "ApplyServerSideEncryptionByDefault": {
+          "SSEAlgorithm": "AES256"
+        }
+      }
+    ]
+  }' --region $REGION
+  
+  echo "Bucket de estado de Terraform creado y configurado"
+fi
 
-# Habilitar versionamiento en el bucket
-aws s3api put-bucket-versioning \
-    --bucket scrumproject-terraform-states \
-    --versioning-configuration Status=Enabled
+# Crear par de claves SSH si no existe
+KEY_NAME="scrumproject-$ENV-key"
+KEY_FILE="$KEY_NAME.pem"
 
-# Crear par de claves SSH para EC2 si no existe
-KEY_NAME="scrumproject-$ENVIRONMENT-key"
-if ! aws ec2 describe-key-pairs --key-names $KEY_NAME --region us-west-2 &> /dev/null; then
-    echo "Creando par de claves SSH: $KEY_NAME"
-    aws ec2 create-key-pair \
-        --key-name $KEY_NAME \
-        --query "KeyMaterial" \
-        --output text > ~/.ssh/$KEY_NAME.pem
-    chmod 400 ~/.ssh/$KEY_NAME.pem
-    echo "Par de claves SSH creado y guardado en ~/.ssh/$KEY_NAME.pem"
+if ! aws ec2 describe-key-pairs --key-names $KEY_NAME --region $REGION &>/dev/null; then
+  echo "Creando par de claves SSH: $KEY_NAME"
+  aws ec2 create-key-pair --key-name $KEY_NAME --query 'KeyMaterial' --output text --region $REGION > $KEY_FILE
+  chmod 400 $KEY_FILE
+  echo "Par de claves SSH creado y guardado en $KEY_FILE"
 else
-    echo "El par de claves SSH $KEY_NAME ya existe"
+  echo "El par de claves SSH $KEY_NAME ya existe"
 fi
 
-# Inicializar Terraform
-cd ../environments/$ENVIRONMENT
+# Inicializar Terraform para el entorno específico
+echo "Inicializando Terraform para el entorno $ENV"
+cd ../environments/$ENV
 terraform init
 
-echo "Configuración completada con éxito. Puedes ejecutar 'terraform plan' para ver los cambios planificados."
+echo "Configuración completada para el entorno $ENV"

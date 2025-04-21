@@ -23,6 +23,7 @@ resource "aws_security_group" "web_ec2" {
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTP"
   }
 
   ingress {
@@ -30,6 +31,7 @@ resource "aws_security_group" "web_ec2" {
     to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "HTTPS"
   }
 
   ingress {
@@ -37,6 +39,7 @@ resource "aws_security_group" "web_ec2" {
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+    description = "SSH"
   }
 
   egress {

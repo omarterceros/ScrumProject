@@ -1,25 +1,24 @@
 output "db_instance_address" {
-  value       = aws_db_instance.postgres.address
   description = "The address of the RDS instance"
+  value       = aws_db_instance.main.address
 }
 
 output "db_instance_endpoint" {
-  value       = aws_db_instance.postgres.endpoint
   description = "The connection endpoint of the RDS instance"
+  value       = aws_db_instance.main.endpoint
 }
 
-output "db_instance_name" {
-  value       = aws_db_instance.postgres.db_name
-  description = "The name of the database"
+output "db_instance_id" {
+  description = "The ID of the RDS instance"
+  value       = aws_db_instance.main.id
 }
 
-output "db_instance_username" {
-  value       = aws_db_instance.postgres.username
-  description = "The master username for the database"
-  sensitive   = true
+output "db_subnet_group_id" {
+  description = "The ID of DB subnet group"
+  value       = aws_db_subnet_group.main.id
 }
 
-output "db_instance_port" {
-  value       = aws_db_instance.postgres.port
-  description = "The database port"
+output "security_group_id" {
+  description = "The ID of the security group"
+  value       = aws_security_group.rds.id
 }

@@ -1,32 +1,60 @@
 #!/bin/bash
-set -e
 
-# Variables
-ENVIRONMENT=$1
-SSH_KEY=$2
-EC2_USER=$3
-EC2_HOST=$4
+# Script para desplegar la aplicación en EC2
 
-# Validar parámetros
-if [ -z "$ENVIRONMENT" ] || [ -z "$SSH_KEY" ] || [ -z "$EC2_USER" ] || [ -z "$EC2_HOST" ]; then
-    echo "Uso: $0 <environment> <ssh_key_path> <ec2_user> <ec2_host>"
-    echo "Ejemplo: $0 develop ~/.ssh/id_rsa ec2-user ec2-xx-xx-xx-xx.compute-1.amazonaws.com"
-    exit 1
+# Verificar que se proporcione un entorno
+if [ "$1" != "develop" ] && [ "$1" != "production" ]; then
+  echo "Uso: $0 [develop|production]"
+  exit 1
 fi
 
-echo "Desplegando en el entorno: $ENVIRONMENT"
-echo "Host: $EC2_HOST"
+ENV=$1
+REGION="us-east-1"
+PROJECT_NAME="scrumproject"
+KEY_NAME="${PROJECT_NAME}-${ENV}-key"
+KEY_FILE="${KEY_NAME}.pem"
 
-# Desplegar en el servidor
-ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no "$EC2_USER@$EC2_HOST" << EOF
-    cd /var/www/scrumproject
-    git pull origin $ENVIRONMENT
-    composer install --no-interaction --prefer-dist --optimize-autoloader
-    php artisan migrate --force
-    php artisan config:cache
-    php artisan route:cache
-    php artisan view:cache
-    chmod -R 775 storage bootstrap/cache
+# Obtener la IP pública de la instancia EC2 usando Terraform
+cd ../environments/$ENV
+EC2_PUBLIC_IP=$(terraform output -raw ec2_public_ip)
+
+if [ -z "$EC2_PUBLIC_IP" ]; then
+  echo "No se pudo obtener la IP pública de la instancia EC2."
+  exit 1
+fi
+
+echo "IP pública de la instancia EC2: $EC2_PUBLIC_IP"
+
+# Esperar a que la instancia esté lista
+echo "Esperando a que la instancia esté lista..."
+sleep 30
+
+# Verificar si existe el archivo de clave
+if [ ! -f "$KEY_FILE" ]; then
+  echo "Archivo de clave $KEY_FILE no encontrado. Utilizando la configuración de claves SSH existente."
+else
+  # Asegurar permisos correctos para la clave
+  chmod 400 $KEY_FILE
+fi
+
+# Implementar la aplicación
+echo "Desplegando la aplicación en el entorno $ENV..."
+
+ssh -o StrictHostKeyChecking=no -i $KEY_FILE ec2-user@$EC2_PUBLIC_IP << EOF
+  cd /var/www/scrumproject
+  git pull origin ${ENV}
+  composer install --no-interaction --prefer-dist --optimize-autoloader
+  php artisan migrate --force
+  php artisan config:cache
+  php artisan route:cache
+  php artisan view:cache
+  echo "Implementación completada en $ENV"
 EOF
 
-echo "Despliegue completado con éxito"
+if [ $? -eq 0 ]; then
+  echo "Despliegue completado con éxito en $ENV."
+  echo "URL de la aplicación: http://$EC2_PUBLIC_IP"
+else
+  echo "Error durante el despliegue."
+  exit 1
+fi

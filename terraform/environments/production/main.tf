@@ -2,7 +2,7 @@ terraform {
   backend "s3" {
     bucket = "scrumproject-terraform-states"
     key    = "production/terraform.tfstate"
-    region = "us-west-2"
+    region = "us-west-2"  # Región donde está el bucket S3
   }
 }
 

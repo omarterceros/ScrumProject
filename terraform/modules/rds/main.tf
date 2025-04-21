@@ -1,23 +1,13 @@
-resource "aws_db_subnet_group" "default" {
-  name       = "${var.project_name}-${var.environment}-db-subnet-group"
-  subnet_ids = var.subnet_ids
-
-  tags = {
-    Name        = "${var.project_name}-${var.environment}-db-subnet-group"
-    Environment = var.environment
-  }
-}
-
 resource "aws_security_group" "rds" {
   name        = "${var.project_name}-${var.environment}-rds-sg"
   description = "Allow database access from EC2 instances"
   vpc_id      = var.vpc_id
 
   ingress {
-    from_port   = var.db_port
-    to_port     = var.db_port
-    protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/16"]  # Permitir conexiones desde la VPC
+    from_port       = var.db_port
+    to_port         = var.db_port
+    protocol        = "tcp"
+    security_groups = [var.ec2_security_group_id]
   }
 
   egress {
@@ -33,26 +23,35 @@ resource "aws_security_group" "rds" {
   }
 }
 
-resource "aws_db_instance" "postgres" {
+resource "aws_db_subnet_group" "main" {
+  name       = "${var.project_name}-${var.environment}-db-subnet-group"
+  subnet_ids = var.subnet_ids
+
+  tags = {
+    Name        = "${var.project_name}-${var.environment}-db-subnet-group"
+    Environment = var.environment
+  }
+}
+
+resource "aws_db_instance" "main" {
   identifier             = "${var.project_name}-${var.environment}-db"
-  engine                 = "postgres"
-  engine_version         = "14.12"  # Versión actualizada a una disponible
-  instance_class         = var.db_instance_class
   allocated_storage      = var.db_allocated_storage
-  storage_type           = "gp2"
+  engine                 = "postgres"
+  engine_version         = "14.12"
+  instance_class         = var.db_instance_class
   db_name                = var.db_name
   username               = var.db_username
   password               = var.db_password
-  port                   = var.db_port
-  db_subnet_group_name   = aws_db_subnet_group.default.name
-  vpc_security_group_ids = [aws_security_group.rds.id]
-
   parameter_group_name   = "default.postgres14"
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+  vpc_security_group_ids = [aws_security_group.rds.id]
   skip_final_snapshot    = true
+  port                   = var.db_port
   publicly_accessible    = false
+  storage_type           = "gp2"
   multi_az               = var.environment == "production" ? true : false
-  backup_retention_period = var.environment == "production" ? 7 : 1
-
+  storage_encrypted      = var.environment == "production" ? true : false
+  
   tags = {
     Name        = "${var.project_name}-${var.environment}-db"
     Environment = var.environment
