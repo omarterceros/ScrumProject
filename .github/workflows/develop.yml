@@ -133,6 +133,7 @@ jobs:
           echo "DB_PASSWORD=postgres" >> .env
           echo "APP_ENV=testing" >> .env
           echo "APP_URL=http://127.0.0.1:8000" >> .env
+          echo "DUSK_DRIVER_URL=http://localhost:9515" >> .env
       
       - name: Run migrations
         run: php artisan migrate --force
@@ -142,15 +143,15 @@ jobs:
 
       - name: Start Chrome Driver
         run: |
-          ./vendor/laravel/dusk/bin/chromedriver-linux --port=9515 --whitelisted-ips --verbose &
-          while ! curl -s http://localhost:9515/status > /dev/null; do sleep 1; done
+          ./vendor/laravel/dusk/bin/chromedriver-linux --port=9515 --whitelisted-ips &
+          sleep 5
         env:
           DISPLAY: :99
 
       - name: Start Laravel Server
         run: |
-          php artisan serve --port=8000 --env=testing &
-          while ! curl -s http://localhost:8000 > /dev/null; do sleep 1; done
+          php artisan serve --port=8000 &
+          sleep 5
         env:
           APP_URL: "http://127.0.0.1:8000"
           DISPLAY: :99
