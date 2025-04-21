@@ -3,6 +3,7 @@
 namespace Tests;
 
 use Illuminate\Foundation\Testing\TestCase as BaseTestCase;
+use Illuminate\Support\Facades\Artisan;
 
 abstract class TestCase extends BaseTestCase
 {
@@ -17,8 +18,15 @@ abstract class TestCase extends BaseTestCase
             require_once __DIR__ . '/../bootstrap/testing.php';
         }
         
-        // Asegúrate de que la base de datos está configurada correctamente para pruebas
-        $this->app['config']->set('database.connections.pgsql.host', 'localhost');
-        $this->app['config']->set('database.connections.pgsql.port', '5433'); // Usa el puerto remapeado
+        // Configura SQLite en memoria
+        $this->app['config']->set('database.default', 'sqlite');
+        $this->app['config']->set('database.connections.sqlite', [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+        ]);
+        
+        // Ejecuta las migraciones
+        Artisan::call('migrate');
     }
 }
