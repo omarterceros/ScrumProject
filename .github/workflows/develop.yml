@@ -6,14 +6,19 @@ on:
   pull_request:
     branches: [ develop ]
 
+env:
+  COMPOSER_MEMORY_LIMIT: -1
+  NODE_OPTIONS: --max_old_space_size=4096
+
 jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     
     services:
       postgres:
-        image: postgres:14
+        image: postgres:14-alpine
         env:
           POSTGRES_DB: scrumproject_test
           POSTGRES_USER: postgres
@@ -22,31 +27,48 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 3
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Cache Node modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules
+            public/build
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
       
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.1'
           extensions: mbstring, pdo, pdo_pgsql, xml, curl, zip
+          coverage: none
       
       - name: Install Node.js dependencies
-        run: npm install
-
+        run: npm ci --prefer-offline
+      
       - name: Build assets with Vite
-        run: npm run build
-
+        run: npm run build -- --mode=production
+      
       - name: Copy .env
         run: cp .env.example .env
       
       - name: Install Composer dependencies
-        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --optimize-autoloader
       
       - name: Generate key
         run: php artisan key:generate
@@ -66,16 +88,17 @@ jobs:
         run: php artisan migrate --force
       
       - name: Run PHPUnit tests
-        run: php artisan test
+        run: php artisan test --parallel
 
   dusk-tests:
     name: Dusk Browser Tests
     runs-on: ubuntu-latest
     needs: test
+    timeout-minutes: 30
     
     services:
       postgres:
-        image: postgres:14
+        image: postgres:14-alpine
         env:
           POSTGRES_DB: scrumproject_test
           POSTGRES_USER: postgres
@@ -84,41 +107,63 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 3
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      
+      - name: Cache Composer dependencies
+        uses: actions/cache@v3
+        with:
+          path: vendor
+          key: ${{ runner.os }}-composer-${{ hashFiles('**/composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Cache Node modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules
+            public/build
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
       
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.1'
           extensions: mbstring, pdo, pdo_pgsql, xml, curl, zip
+          coverage: none
 
-      - name: Install Chrome and X11 dependencies
+      - name: Install Chrome dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y google-chrome-stable xvfb libglib2.0-0 libnss3 libx11-6
-
+          sudo apt-get install -y --no-install-recommends \
+            google-chrome-stable \
+            xvfb \
+            libglib2.0-0 \
+            libnss3 \
+            libx11-6
+      
       - name: Start Xvfb
         run: |
           Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
-          export DISPLAY=:99
-
+          echo "DISPLAY=:99" >> $GITHUB_ENV
+      
       - name: Install Node.js dependencies
-        run: npm install
-
+        run: npm ci --prefer-offline
+      
       - name: Build assets with Vite
-        run: npm run build
-
+        run: npm run build -- --mode=production
+      
       - name: Copy .env
         run: cp .env.example .env
       
       - name: Install Composer dependencies
-        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress
+        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --optimize-autoloader
       
       - name: Generate key
         run: php artisan key:generate
@@ -138,26 +183,15 @@ jobs:
       - name: Run migrations
         run: php artisan migrate --force
 
-      - name: Upgrade Chrome Driver
-        run: php artisan dusk:chrome-driver --detect
-
-      - name: Start Chrome Driver
+      - name: Setup Chrome Driver
         run: |
+          php artisan dusk:chrome-driver --detect
           ./vendor/laravel/dusk/bin/chromedriver-linux --port=9515 --whitelisted-ips &
-          sleep 5
-        env:
-          DISPLAY: :99
-
-      - name: Start Laravel Server
-        run: |
           php artisan serve --port=8000 &
           sleep 5
-        env:
-          APP_URL: "http://127.0.0.1:8000"
-          DISPLAY: :99
-
+      
       - name: Run Dusk Tests
-        run: php artisan dusk --without-tty
+        run: php artisan dusk --without-tty --parallel
         env:
           APP_URL: "http://127.0.0.1:8000"
           DISPLAY: :99
@@ -167,6 +201,7 @@ jobs:
     needs: [test, dusk-tests]
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
+    timeout-minutes: 30
     
     steps:
       - name: Checkout code
@@ -175,35 +210,25 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
         with:
-          terraform_version: 1.0.0
+          terraform_version: 1.5.5
+          terraform_wrapper: false
       
       - name: Configure AWS credentials for S3 backend
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
       
-      - name: Create S3 bucket for Terraform state if not exists
-        run: |
-          aws s3api head-bucket --bucket scrumproject-terraform-states 2>/dev/null || aws s3 mb s3://scrumproject-terraform-states --region us-west-2
-      
       - name: Terraform Init
         run: |
           cd terraform/environments/develop
-          terraform init -reconfigure
-      
-      - name: Configure AWS credentials for infrastructure deployment
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          terraform init -reconfigure -input=false
       
       - name: Terraform Apply
         run: |
           cd terraform/environments/develop
-          terraform apply -auto-approve
+          terraform apply -auto-approve -input=false -lock-timeout=10m
       
       - name: Deploy to EC2
         env:
@@ -214,12 +239,19 @@ jobs:
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
           
+          rsync -avz -e "ssh -o StrictHostKeyChecking=no -i private_key.pem" \
+            --exclude='node_modules' \
+            --exclude='.git' \
+            --exclude='.env' \
+            --delete \
+            ./ $EC2_USER@$EC2_HOST:/var/www/scrumproject/
+          
           ssh -o StrictHostKeyChecking=no -i private_key.pem $EC2_USER@$EC2_HOST << 'ENDSSH'
             cd /var/www/scrumproject
-            git pull origin develop
-            composer install --no-interaction --prefer-dist --optimize-autoloader
+            composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
             php artisan migrate --force
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
+            sudo systemctl restart php-fpm nginx
           ENDSSH
