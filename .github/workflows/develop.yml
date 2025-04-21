@@ -98,6 +98,16 @@ jobs:
           php-version: '8.1'
           extensions: mbstring, pdo, pdo_pgsql, xml, curl, zip
 
+      - name: Install Chrome and X11 dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable xvfb libglib2.0-0 libnss3 libx11-6
+
+      - name: Start Xvfb
+        run: Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+        env:
+          DISPLAY: :99
+
       - name: Install Node.js dependencies
         run: npm install
 
@@ -126,22 +136,26 @@ jobs:
       
       - name: Run migrations
         run: php artisan migrate --force
-      
+
       - name: Upgrade Chrome Driver
         run: php artisan dusk:chrome-driver --detect
-      
+
       - name: Start Chrome Driver
-        run: ./vendor/laravel/dusk/bin/chromedriver-linux &
-      
+        run: ./vendor/laravel/dusk/bin/chromedriver-linux --port=9515 --url-base=/wd/hub &
+        env:
+          DISPLAY: :99
+
       - name: Start Laravel Server
-        run: php artisan serve &
+        run: php artisan serve --port=8000 --env=testing &
         env:
           APP_URL: "http://127.0.0.1:8000"
-      
+          DISPLAY: :99
+
       - name: Run Dusk Tests
-        run: php artisan dusk
+        run: php artisan dusk --without-tty
         env:
           APP_URL: "http://127.0.0.1:8000"
+          DISPLAY: :99
 
   deploy-to-develop:
     name: Deploy to Development

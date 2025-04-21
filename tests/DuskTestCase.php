@@ -44,25 +44,19 @@ abstract class DuskTestCase extends BaseTestCase
     {
         $options = (new ChromeOptions)->addArguments([
             '--disable-gpu',
-            '--headless',
+            '--headless=new',          // ← Nuevo modo headless
             '--no-sandbox',
+            '--disable-dev-shm-usage', // ← Evita errores de memoria en CI [[7]][[8]]
             '--window-size=1920,1080',
         ]);
 
-        if (static::runningInContainer()) {
-            return RemoteWebDriver::create(
-                getenv('DUSK_DRIVER_URL'),
-                DesiredCapabilities::chrome()->setCapability(
-                    ChromeOptions::CAPABILITY, $options
-                )
-            );
-        } else {
-            return RemoteWebDriver::create(
-                'http://localhost:9515',
-                DesiredCapabilities::chrome()->setCapability(
-                    ChromeOptions::CAPABILITY, $options
-                )
-            );
-        }
+        return RemoteWebDriver::create(
+            'http://localhost:9515', // ← URL correcta para ChromeDriver [[8]]
+            DesiredCapabilities::chrome()->setCapability(
+                ChromeOptions::CAPABILITY, $options
+            ),
+            60000, // Timeout de conexión
+            60000  // Timeout de solicitud
+        );
     }
 }
