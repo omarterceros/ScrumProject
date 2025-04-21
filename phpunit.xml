@@ -22,8 +22,8 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_DRIVER" value="array"/>
         <env name="DB_CONNECTION" value="pgsql"/>
-        <env name="DB_HOST" value="db"/>
-        <env name="DB_PORT" value="5432"/>
+        <env name="DB_HOST" value="localhost"/>
+        <env name="DB_PORT" value="5433"/>
         <env name="DB_DATABASE" value="scrumproject"/>
         <env name="DB_USERNAME" value="postgres"/>
         <env name="DB_PASSWORD" value="postgres"/>
@@ -31,7 +31,6 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
-        <!-- Añade esta línea para solucionar el problema de Vite -->
         <env name="ASSET_URL" value=""/>
     </php>
 </phpunit>

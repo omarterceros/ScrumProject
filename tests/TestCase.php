@@ -16,5 +16,9 @@ abstract class TestCase extends BaseTestCase
         if (file_exists(__DIR__ . '/../bootstrap/testing.php')) {
             require_once __DIR__ . '/../bootstrap/testing.php';
         }
+        
+        // Asegúrate de que la base de datos está configurada correctamente para pruebas
+        $this->app['config']->set('database.connections.pgsql.host', 'localhost');
+        $this->app['config']->set('database.connections.pgsql.port', '5433'); // Usa el puerto remapeado
     }
 }
