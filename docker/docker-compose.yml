@@ -1,0 +1,52 @@
+services:
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      args:
+        user: ${USER:-appuser}
+        uid: ${UID:-1000}
+    container_name: scrumproject-app
+    restart: unless-stopped
+    working_dir: /var/www
+    volumes:
+      - ../:/var/www
+    networks:
+      - scrumproject
+    depends_on:
+      - db
+    ports:
+      - "8000:80"
+
+  db:
+    image: postgres:14
+    container_name: scrumproject-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-scrumproject}
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - scrumproject
+    ports:
+      - "5433:5432" 
+
+  # Configuración actualizada de Selenium para Apple Silicon
+  selenium:
+    image: seleniarm/standalone-chromium:latest
+    container_name: scrumproject-selenium
+    volumes:
+      - /dev/shm:/dev/shm
+    networks:
+      - scrumproject
+    ports:
+      - "4444:4444"
+
+networks:
+  scrumproject:
+    driver: bridge
+
+volumes:
+  pgdata:
