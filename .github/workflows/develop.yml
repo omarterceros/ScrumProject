@@ -104,9 +104,9 @@ jobs:
           sudo apt-get install -y google-chrome-stable xvfb libglib2.0-0 libnss3 libx11-6
 
       - name: Start Xvfb
-        run: Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
-        env:
-          DISPLAY: :99
+        run: |
+          Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
+          export DISPLAY=:99
 
       - name: Install Node.js dependencies
         run: npm install
@@ -141,12 +141,16 @@ jobs:
         run: php artisan dusk:chrome-driver --detect
 
       - name: Start Chrome Driver
-        run: ./vendor/laravel/dusk/bin/chromedriver-linux --port=9515 --url-base=/wd/hub &
+        run: |
+          ./vendor/laravel/dusk/bin/chromedriver-linux --port=9515 --whitelisted-ips --verbose &
+          while ! curl -s http://localhost:9515/status > /dev/null; do sleep 1; done
         env:
           DISPLAY: :99
 
       - name: Start Laravel Server
-        run: php artisan serve --port=8000 --env=testing &
+        run: |
+          php artisan serve --port=8000 --env=testing &
+          while ! curl -s http://localhost:8000 > /dev/null; do sleep 1; done
         env:
           APP_URL: "http://127.0.0.1:8000"
           DISPLAY: :99
