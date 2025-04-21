@@ -36,10 +36,16 @@ jobs:
           php-version: '8.1'
           extensions: mbstring, pdo, pdo_pgsql, xml, curl, zip
       
+      - name: Install Node.js dependencies
+        run: npm install
+
+      - name: Build assets with Vite
+        run: npm run build
+
       - name: Copy .env
         run: cp .env.example .env
       
-      - name: Install Dependencies
+      - name: Install Composer dependencies
         run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress
       
       - name: Generate key
@@ -53,18 +59,15 @@ jobs:
           echo "DB_DATABASE=scrumproject_test" >> .env
           echo "DB_USERNAME=postgres" >> .env
           echo "DB_PASSWORD=postgres" >> .env
+          echo "APP_ENV=testing" >> .env
+          echo "APP_URL=http://localhost" >> .env
       
       - name: Run migrations
         run: php artisan migrate --force
       
-      - name: Create mock Vite manifest
-        run: |
-          mkdir -p public/build
-          echo '{}' > public/build/manifest.json
-      
       - name: Run PHPUnit tests
         run: php artisan test
-  
+
   dusk-tests:
     name: Dusk Browser Tests
     runs-on: ubuntu-latest
@@ -94,11 +97,17 @@ jobs:
         with:
           php-version: '8.1'
           extensions: mbstring, pdo, pdo_pgsql, xml, curl, zip
-      
+
+      - name: Install Node.js dependencies
+        run: npm install
+
+      - name: Build assets with Vite
+        run: npm run build
+
       - name: Copy .env
         run: cp .env.example .env
       
-      - name: Install Dependencies
+      - name: Install Composer dependencies
         run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress
       
       - name: Generate key
@@ -112,15 +121,11 @@ jobs:
           echo "DB_DATABASE=scrumproject_test" >> .env
           echo "DB_USERNAME=postgres" >> .env
           echo "DB_PASSWORD=postgres" >> .env
+          echo "APP_ENV=testing" >> .env
           echo "APP_URL=http://127.0.0.1:8000" >> .env
       
       - name: Run migrations
         run: php artisan migrate --force
-      
-      - name: Create mock Vite manifest
-        run: |
-          mkdir -p public/build
-          echo '{}' > public/build/manifest.json
       
       - name: Upgrade Chrome Driver
         run: php artisan dusk:chrome-driver --detect
@@ -137,7 +142,7 @@ jobs:
         run: php artisan dusk
         env:
           APP_URL: "http://127.0.0.1:8000"
-  
+
   deploy-to-develop:
     name: Deploy to Development
     needs: [test, dusk-tests]
@@ -179,7 +184,6 @@ jobs:
           echo "$PRIVATE_KEY" > private_key.pem
           chmod 600 private_key.pem
           
-          # Deploy using SSH
           ssh -o StrictHostKeyChecking=no -i private_key.pem $EC2_USER@$EC2_HOST << 'ENDSSH'
             cd /var/www/scrumproject
             git pull origin develop
